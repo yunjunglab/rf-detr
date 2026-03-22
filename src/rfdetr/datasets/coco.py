@@ -271,10 +271,14 @@ class ConvertCoco(object):
 
         # add keypoints if requested
         if self.include_keypoints:
-            has_keypoints = len(anno) > 0 and "keypoints" in anno[0]
+            # Search all annotations for the first one with keypoints, not just anno[0].
+            # In COCO, only 'person' has keypoints; mixed-category images may have
+            # non-keypoint annotations before person annotations.
+            first_kpt_anno = next((obj for obj in anno if "keypoints" in obj), None)
+            has_keypoints = first_kpt_anno is not None
             if has_keypoints:
                 # Infer num_keypoints from first annotated instance that has keypoints
-                num_keypoints = len(anno[0]["keypoints"]) // 3
+                num_keypoints = len(first_kpt_anno["keypoints"]) // 3
                 kpts_list = []
                 for obj in anno:
                     raw = obj.get("keypoints", [])

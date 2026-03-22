@@ -185,8 +185,7 @@ class HungarianMatcher(nn.Module):
             tgt_vis = tgt_kpts[..., 2]         # (T, K)
             # Pairwise L1 over keypoints: (B*Q, T, K)
             # pred_kpts[:, None]: (B*Q, 1, K, 2)  tgt_kpts_xy[None]: (1, T, K, 2)
-            diff = (pred_kpts[:, None, :, :] - tgt_kpts_xy[None, :, :, :]).abs()  # (B*Q, T, K, 2)
-            kpt_l1 = diff.sum(-1)  # (B*Q, T, K) — per-keypoint L1 distance
+            kpt_l1 = (pred_kpts[:, None] - tgt_kpts_xy[None]).abs().sum(-1)  # (B*Q, T, K)
             # Weight by visibility and average over visible keypoints per target
             vis_mask = (tgt_vis > 0).float()  # (T, K)
             vis_sum = vis_mask.sum(-1).clamp(min=1.0)  # (T,)

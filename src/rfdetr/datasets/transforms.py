@@ -425,16 +425,17 @@ class AlbumentationsWrapper:
             kpts_tensor = target["keypoints"]  # (N, K, 3)
             kpts_np_raw = kpts_tensor.cpu().numpy() if torch.is_tensor(kpts_tensor) else np.array(kpts_tensor)
             num_keypoints = kpts_np_raw.shape[1] if kpts_np_raw.ndim == 3 else 0
-            for inst_i in range(num_boxes):
-                for kpt_k in range(num_keypoints):
-                    vis = float(kpts_np_raw[inst_i, kpt_k, 2])
-                    if vis > 0:
-                        x = float(kpts_np_raw[inst_i, kpt_k, 0])
-                        y = float(kpts_np_raw[inst_i, kpt_k, 1])
-                        label = inst_i * _MAX_KPTS + kpt_k
-                        kpts_flat.append((x, y))
-                        kpt_vis_dict[label] = vis
-                        kpt_labels_in.append(label)
+            if num_keypoints > 0:
+                # Vectorized: find all visible keypoints at once using np.where
+                inst_idxs, kpt_idxs = np.where(kpts_np_raw[:, :, 2] > 0)
+                if len(inst_idxs) > 0:
+                    labels_arr = inst_idxs * _MAX_KPTS + kpt_idxs
+                    xs = kpts_np_raw[inst_idxs, kpt_idxs, 0]
+                    ys = kpts_np_raw[inst_idxs, kpt_idxs, 1]
+                    vis_vals = kpts_np_raw[inst_idxs, kpt_idxs, 2]
+                    kpts_flat = list(zip(xs.tolist(), ys.tolist()))
+                    kpt_labels_in = labels_arr.tolist()
+                    kpt_vis_dict = dict(zip(labels_arr.tolist(), vis_vals.tolist()))
 
         # Apply transform
         transform_kwargs = {

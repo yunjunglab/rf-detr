@@ -22,7 +22,7 @@ LW-DETR model and criterion classes
 
 import copy
 import math
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import torch
 import torch.nn.functional as F
@@ -210,9 +210,7 @@ class LWDETR(nn.Module):
                 outputs_masks = seg_head_fwd(features[0].tensors, hs, samples.tensors.shape[-2:])
 
             if self.keypoint_head:
-                # outputs_kpts: (num_layers, B, Q, num_keypoints*2) → sigmoid to [0,1]
                 outputs_kpts = self.keypoint_embed(hs).sigmoid()
-                # reshape to (num_layers, B, Q, num_keypoints, 2)
                 outputs_kpts = outputs_kpts.reshape(
                     *outputs_kpts.shape[:3], self.num_keypoints, 2
                 )
@@ -713,25 +711,27 @@ class SetCriterion(nn.Module):
         """
         if "pred_keypoints" not in outputs:
             return {}
-        if not any("keypoints" in t for t in targets):
-            return {}
-        idx = self._get_src_permutation_idx(indices)
-        # No matched pairs → return zero loss (keeps gradient graph intact)
-        if idx[0].numel() == 0:
-            return {"loss_keypoints": outputs["pred_keypoints"].sum() * 0.0}
-        src_kpts = outputs["pred_keypoints"][idx]  # (M, K, 2)
-        tgt_kpts_list = [
-            t["keypoints"][j]
-            for t, (_, j) in zip(targets, indices)
-            if "keypoints" in t and len(j) > 0
-        ]
-        if not tgt_kpts_list:
-            return {"loss_keypoints": outputs["pred_keypoints"].sum() * 0.0}
+        pred_kpts = outputs["pred_keypoints"]  # (B, Q, K, 2)
+
+        # Iterate per image to handle mixed batches where some images have K=0
+        # (e.g. COCO non-person images). A flat torch.cat across images with
+        # different K values would raise a shape mismatch RuntimeError.
+        src_kpts_list: List = []
+        tgt_kpts_list: List = []
+        for i, (t, (src_idx, tgt_idx)) in enumerate(zip(targets, indices)):
+            if "keypoints" not in t or t["keypoints"].shape[1] == 0 or len(tgt_idx) == 0:
+                continue
+            src_kpts_list.append(pred_kpts[i][src_idx])    # (n, K, 2)
+            tgt_kpts_list.append(t["keypoints"][tgt_idx])  # (n, K, 3)
+
+        if not src_kpts_list:
+            return {"loss_keypoints": pred_kpts.sum() * 0.0}
+
+        src_kpts = torch.cat(src_kpts_list, dim=0)  # (M, K, 2)
         tgt_kpts = torch.cat(tgt_kpts_list, dim=0)  # (M, K, 3)
-        tgt_xy = tgt_kpts[..., :2]   # (M, K, 2)
-        tgt_vis = tgt_kpts[..., 2]   # (M, K)
-        vis_mask = (tgt_vis > 0).float().unsqueeze(-1)  # (M, K, 1)
-        loss = F.l1_loss(src_kpts * vis_mask, tgt_xy * vis_mask, reduction="sum")
+        # Index only visible keypoints to avoid zero-multiply overhead
+        vis_mask = tgt_kpts[..., 2] > 0  # (M, K) bool
+        loss = F.l1_loss(src_kpts[vis_mask], tgt_kpts[..., :2][vis_mask], reduction="sum")
         return {"loss_keypoints": loss / num_boxes}
 
     def _get_src_permutation_idx(self, indices):
