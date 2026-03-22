@@ -62,6 +62,8 @@ class LWDETR(nn.Module):
         two_stage=False,
         lite_refpoint_refine=False,
         bbox_reparam=False,
+        keypoint_head=False,
+        num_keypoints=17,
     ):
         """Initializes the model.
         Parameters:
@@ -81,6 +83,13 @@ class LWDETR(nn.Module):
         self.class_embed = nn.Linear(hidden_dim, num_classes)
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         self.segmentation_head = segmentation_head
+        self.keypoint_head = keypoint_head
+        self.num_keypoints = num_keypoints
+        if keypoint_head:
+            # Predict (x, y) for each keypoint in normalized [0, 1] coords
+            self.keypoint_embed = MLP(hidden_dim, hidden_dim, num_keypoints * 2, 3)
+            nn.init.constant_(self.keypoint_embed.layers[-1].weight.data, 0)
+            nn.init.constant_(self.keypoint_embed.layers[-1].bias.data, 0)
 
         query_dim = 4
         self.refpoint_embed = nn.Embedding(num_queries * group_detr, query_dim)
@@ -200,14 +209,25 @@ class LWDETR(nn.Module):
             if self.segmentation_head is not None:
                 outputs_masks = seg_head_fwd(features[0].tensors, hs, samples.tensors.shape[-2:])
 
+            if self.keypoint_head:
+                # outputs_kpts: (num_layers, B, Q, num_keypoints*2) → sigmoid to [0,1]
+                outputs_kpts = self.keypoint_embed(hs).sigmoid()
+                # reshape to (num_layers, B, Q, num_keypoints, 2)
+                outputs_kpts = outputs_kpts.reshape(
+                    *outputs_kpts.shape[:3], self.num_keypoints, 2
+                )
+
             out = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord[-1]}
             if self.segmentation_head is not None:
                 out["pred_masks"] = outputs_masks[-1]
+            if self.keypoint_head:
+                out["pred_keypoints"] = outputs_kpts[-1]
             if self.aux_loss:
                 out["aux_outputs"] = self._set_aux_loss(
                     outputs_class,
                     outputs_coord,
                     outputs_masks if self.segmentation_head is not None else None,
+                    outputs_kpts if self.keypoint_head else None,
                 )
 
         if self.two_stage:
@@ -290,17 +310,19 @@ class LWDETR(nn.Module):
             return outputs_coord, outputs_class
 
     @torch.jit.unused
-    def _set_aux_loss(self, outputs_class, outputs_coord, outputs_masks):
+    def _set_aux_loss(self, outputs_class, outputs_coord, outputs_masks, outputs_kpts=None):
         # this is a workaround to make torchscript happy, as torchscript
         # doesn't support dictionary with non-homogeneous values, such
         # as a dict having both a Tensor and a list.
-        if outputs_masks is not None:
-            return [
-                {"pred_logits": a, "pred_boxes": b, "pred_masks": c}
-                for a, b, c in zip(outputs_class[:-1], outputs_coord[:-1], outputs_masks[:-1])
-            ]
-        else:
-            return [{"pred_logits": a, "pred_boxes": b} for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
+        aux = []
+        for i, (a, b) in enumerate(zip(outputs_class[:-1], outputs_coord[:-1])):
+            entry: dict = {"pred_logits": a, "pred_boxes": b}
+            if outputs_masks is not None:
+                entry["pred_masks"] = outputs_masks[i]
+            if outputs_kpts is not None:
+                entry["pred_keypoints"] = outputs_kpts[i]
+            aux.append(entry)
+        return aux
 
     def _get_backbone_encoder_layers(self) -> Optional[nn.ModuleList]:
         """Resolve the list of transformer blocks/layers from backbone[0].encoder.
@@ -670,6 +692,48 @@ class SetCriterion(nn.Module):
         del target_masks
         return losses
 
+    def loss_keypoints(self, outputs, targets, indices, num_boxes):
+        """Visibility-weighted L1 regression loss for keypoints.
+
+        Only keypoints with visibility > 0 in the ground-truth contribute to
+        the loss.  Predictions are expected to be normalized ``[0, 1]`` xy
+        coordinates produced by a sigmoid-activated head.
+
+        Args:
+            outputs: Model output dict; must contain ``"pred_keypoints"`` of
+                shape ``(B, Q, num_keypoints, 2)``.
+            targets: List of per-image target dicts; each must contain
+                ``"keypoints"`` of shape ``(N, num_keypoints, 3)`` with columns
+                ``[x_norm, y_norm, visibility]``.
+            indices: Matching indices from the Hungarian matcher.
+            num_boxes: Normalisation denominator (total number of GT boxes).
+
+        Returns:
+            Dict with key ``"loss_keypoints"``.
+        """
+        if "pred_keypoints" not in outputs:
+            return {}
+        if not any("keypoints" in t for t in targets):
+            return {}
+        idx = self._get_src_permutation_idx(indices)
+        # No matched pairs → return zero loss (keeps gradient graph intact)
+        if idx[0].numel() == 0:
+            return {"loss_keypoints": outputs["pred_keypoints"].sum() * 0.0}
+        src_kpts = outputs["pred_keypoints"][idx]  # (M, K, 2)
+        tgt_kpts_list = [
+            t["keypoints"][j]
+            for t, (_, j) in zip(targets, indices)
+            if "keypoints" in t and len(j) > 0
+        ]
+        if not tgt_kpts_list:
+            return {"loss_keypoints": outputs["pred_keypoints"].sum() * 0.0}
+        tgt_kpts = torch.cat(tgt_kpts_list, dim=0)  # (M, K, 3)
+        tgt_xy = tgt_kpts[..., :2]   # (M, K, 2)
+        tgt_vis = tgt_kpts[..., 2]   # (M, K)
+        vis_mask = (tgt_vis > 0).float().unsqueeze(-1)  # (M, K, 1)
+        loss = F.l1_loss(src_kpts * vis_mask, tgt_xy * vis_mask, reduction="sum")
+        return {"loss_keypoints": loss / num_boxes}
+
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
         batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
@@ -688,6 +752,7 @@ class SetCriterion(nn.Module):
             "cardinality": self.loss_cardinality,
             "boxes": self.loss_boxes,
             "masks": self.loss_masks,
+            "keypoints": self.loss_keypoints,
         }
         assert loss in loss_map, f"do you really want to compute {loss} loss?"
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
@@ -864,6 +929,7 @@ class PostProcess(nn.Module):
         """
         out_logits, out_bbox = outputs["pred_logits"], outputs["pred_boxes"]
         out_masks = outputs.get("pred_masks", None)
+        out_kpts = outputs.get("pred_keypoints", None)
 
         assert len(out_logits) == len(target_sizes)
         assert target_sizes.shape[1] == 2
@@ -900,9 +966,22 @@ class PostProcess(nn.Module):
                     align_corners=False,
                 )  # [K,1,H,W]
                 res_i["masks"] = masks_i > 0.0
+                if out_kpts is not None:
+                    kpts_i = out_kpts[i][k_idx]  # (num_select, num_keypoints, 2) — normalized
+                    h_f, w_f = float(target_sizes[i][0]), float(target_sizes[i][1])
+                    scale_kpt = torch.tensor([w_f, h_f], device=kpts_i.device, dtype=kpts_i.dtype)
+                    res_i["keypoints"] = kpts_i * scale_kpt  # absolute pixel coords
                 results.append(res_i)
         else:
-            results = [{"scores": s, "labels": l, "boxes": b} for s, l, b in zip(scores, labels, boxes)]
+            for i, (s, l, b) in enumerate(zip(scores, labels, boxes)):
+                res_i = {"scores": s, "labels": l, "boxes": b}
+                if out_kpts is not None:
+                    k_idx = topk_boxes[i]
+                    kpts_i = out_kpts[i][k_idx]  # (num_select, num_keypoints, 2)
+                    h_f, w_f = float(target_sizes[i][0]), float(target_sizes[i][1])
+                    scale_kpt = torch.tensor([w_f, h_f], device=kpts_i.device, dtype=kpts_i.dtype)
+                    res_i["keypoints"] = kpts_i * scale_kpt
+                results.append(res_i)
 
         return results
 
@@ -991,6 +1070,8 @@ def build_model(args):
         two_stage=args.two_stage,
         lite_refpoint_refine=args.lite_refpoint_refine,
         bbox_reparam=args.bbox_reparam,
+        keypoint_head=getattr(args, "keypoint_head", False),
+        num_keypoints=getattr(args, "num_keypoints", 17),
     )
     return model
 
@@ -1003,6 +1084,10 @@ def build_criterion_and_postprocessors(args):
     if args.segmentation_head:
         weight_dict["loss_mask_ce"] = args.mask_ce_loss_coef
         weight_dict["loss_mask_dice"] = args.mask_dice_loss_coef
+    # Add keypoint weight BEFORE building aux_weight_dict so aux layers are also weighted
+    keypoint_head = getattr(args, "keypoint_head", False)
+    if keypoint_head:
+        weight_dict["loss_keypoints"] = getattr(args, "keypoint_loss_coef", 5.0)
     # TODO this is a hack
     if args.aux_loss:
         aux_weight_dict = {}
@@ -1015,6 +1100,8 @@ def build_criterion_and_postprocessors(args):
     losses = ["labels", "boxes", "cardinality"]
     if args.segmentation_head:
         losses.append("masks")
+    if keypoint_head:
+        losses.append("keypoints")
 
     sum_group_losses = getattr(args, "sum_group_losses", False)
     if args.segmentation_head:

@@ -1161,6 +1161,11 @@ def populate_args(
     early_stopping_min_delta=0.001,
     early_stopping_use_ema=False,
     gradient_checkpointing=False,
+    # Keypoint parameters
+    keypoint_head=False,
+    num_keypoints=17,
+    keypoint_loss_coef=5.0,
+    set_cost_keypoint=5.0,
     # Additional
     subcommand=None,
     **extra_kwargs,  # To handle any unexpected arguments
@@ -1263,6 +1268,10 @@ def populate_args(
         early_stopping_min_delta=early_stopping_min_delta,
         early_stopping_use_ema=early_stopping_use_ema,
         gradient_checkpointing=gradient_checkpointing,
+        keypoint_head=keypoint_head,
+        num_keypoints=num_keypoints,
+        keypoint_loss_coef=keypoint_loss_coef,
+        set_cost_keypoint=set_cost_keypoint,
         **extra_kwargs,
     )
     return args

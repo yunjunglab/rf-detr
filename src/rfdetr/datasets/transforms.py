@@ -54,6 +54,12 @@ class Normalize(object):
             boxes = box_xyxy_to_cxcywh(boxes)
             boxes = boxes / torch.tensor([w, h, w, h], dtype=torch.float32)
             target["boxes"] = boxes
+        if "keypoints" in target:
+            kpts = target["keypoints"]  # (N, K, 3): [x, y, visibility]
+            if kpts.numel() > 0 and kpts.shape[1] > 0:
+                # Normalize xy by image size; keep visibility unchanged
+                scale = torch.tensor([w, h, 1.0], dtype=torch.float32)
+                target["keypoints"] = kpts / scale
         return image, target
 
 
@@ -271,6 +277,11 @@ class AlbumentationsWrapper:
                     min_visibility=0.0,  # Remove boxes with zero visibility/area after transformation
                     clip=True,  # Clip box coordinates to image boundaries after transformation
                 ),
+                keypoint_params=A.KeypointParams(
+                    format="xy",  # Keypoints are (x, y) pairs
+                    label_fields=["keypoint_labels"],  # Encoded as instance_idx * MAX_KPTS + kpt_idx
+                    remove_invisible=True,  # Remove keypoints outside image bounds after transform
+                ),
             )
         else:
             # Wrap non-geometric transform without bbox handling
@@ -400,8 +411,40 @@ class AlbumentationsWrapper:
                 raise ValueError(f"masks must have shape (N, H, W), got {masks_np.shape}")
             masks_np = masks_np.astype(np.uint8, copy=False)
             masks_list = [mask for mask in masks_np]
+
+        # Flatten keypoints (N, K, 3) → list of (x, y) for albumentations
+        # Only pass originally-labeled keypoints (visibility > 0) to transform.
+        # keypoint_labels encodes (instance_idx, kpt_idx) as instance_idx * _MAX_KPTS + kpt_idx.
+        _MAX_KPTS = 256  # larger than any realistic num_keypoints
+        kpts_flat: List[Tuple[float, float]] = []
+        kpt_vis_dict: Dict[int, float] = {}  # encoded_label -> orig_visibility (O(1) lookup)
+        kpt_labels_in: List[int] = []
+        kpts_tensor: Optional[torch.Tensor] = None
+        num_keypoints: int = 0
+        if "keypoints" in target:
+            kpts_tensor = target["keypoints"]  # (N, K, 3)
+            kpts_np_raw = kpts_tensor.cpu().numpy() if torch.is_tensor(kpts_tensor) else np.array(kpts_tensor)
+            num_keypoints = kpts_np_raw.shape[1] if kpts_np_raw.ndim == 3 else 0
+            for inst_i in range(num_boxes):
+                for kpt_k in range(num_keypoints):
+                    vis = float(kpts_np_raw[inst_i, kpt_k, 2])
+                    if vis > 0:
+                        x = float(kpts_np_raw[inst_i, kpt_k, 0])
+                        y = float(kpts_np_raw[inst_i, kpt_k, 1])
+                        label = inst_i * _MAX_KPTS + kpt_k
+                        kpts_flat.append((x, y))
+                        kpt_vis_dict[label] = vis
+                        kpt_labels_in.append(label)
+
         # Apply transform
-        transform_kwargs = {"image": image_np, "bboxes": boxes_np, "category_ids": labels, "idxs": idxs}
+        transform_kwargs = {
+            "image": image_np,
+            "bboxes": boxes_np,
+            "category_ids": labels,
+            "idxs": idxs,
+            "keypoints": kpts_flat,
+            "keypoint_labels": kpt_labels_in,
+        }
         if masks_list is not None and len(masks_list) > 0:
             transform_kwargs["masks"] = masks_list
         augmented = self.transform(**transform_kwargs)
@@ -417,6 +460,9 @@ class AlbumentationsWrapper:
             if "masks" in target:
                 aug_height, aug_width = augmented["image"].shape[:2]
                 target_out["masks"] = torch.zeros((0, aug_height, aug_width), dtype=torch.bool)
+            # Override keypoints after _clear_per_instance_fields
+            if kpts_tensor is not None:
+                target_out["keypoints"] = torch.zeros((0, num_keypoints, 3), dtype=torch.float32)
         else:
             target_out["boxes"] = torch.as_tensor(bboxes_aug, dtype=torch.float32).reshape(-1, 4)
             target_out["labels"] = torch.tensor(augmented["category_ids"], dtype=torch.long)
@@ -426,6 +472,23 @@ class AlbumentationsWrapper:
             if "area" in target_out:
                 boxes = target_out["boxes"]
                 target_out["area"] = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+
+            # Reconstruct per-instance keypoints from transformed flat list
+            if kpts_tensor is not None:
+                n_kept = len(kept_idxs)
+                kpts_out_np = np.zeros((n_kept, num_keypoints, 3), dtype=np.float32)
+                orig_to_new = {orig: new for new, orig in enumerate(kept_idxs)}
+                kpts_transformed = augmented.get("keypoints", [])
+                kpt_labels_out = augmented.get("keypoint_labels", [])
+                for (x, y), label in zip(kpts_transformed, kpt_labels_out):
+                    orig_i = label // _MAX_KPTS
+                    kpt_k = label % _MAX_KPTS
+                    if orig_i in orig_to_new:
+                        new_i = orig_to_new[orig_i]
+                        orig_vis = kpt_vis_dict.get(label, 0.0)  # O(1) lookup
+                        kpts_out_np[new_i, kpt_k] = [x, y, orig_vis]
+                target_out["keypoints"] = torch.as_tensor(kpts_out_np, dtype=torch.float32)
+
         image_out = Image.fromarray(augmented["image"])
         if masks_list is not None and "masks" in augmented:
             height, width = augmented["image"].shape[:2]
@@ -485,8 +548,15 @@ class AlbumentationsWrapper:
         if target is None:
             image_np = np.array(image)
             if self._is_geometric:
-                # Geometric A.Compose requires label_fields even when there are no boxes
-                augmented = self.transform(image=image_np, bboxes=[], category_ids=[], idxs=[])
+                # Geometric A.Compose requires label_fields even when there are no boxes/keypoints
+                augmented = self.transform(
+                    image=image_np,
+                    bboxes=[],
+                    category_ids=[],
+                    idxs=[],
+                    keypoints=[],
+                    keypoint_labels=[],
+                )
             else:
                 augmented = self.transform(image=image_np)
             return Image.fromarray(augmented["image"]), None

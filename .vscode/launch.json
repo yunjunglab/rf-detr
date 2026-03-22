@@ -1,0 +1,165 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "RF-DETR Train (Base, COCO/Roboflow)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "args": [
+                "--dataset_dir", "${input:datasetDir}",
+                "--model", "base",
+                "--epochs", "100",
+                "--batch_size", "4",
+                "--output_dir", "output",
+                "--dataset_format", "roboflow"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+            }
+        },
+        {
+            "name": "RF-DETR Train (Large)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "args": [
+                "--dataset_dir", "${input:datasetDir}",
+                "--model", "large",
+                "--epochs", "100",
+                "--batch_size", "2",
+                "--grad_accum_steps", "8",
+                "--output_dir", "output",
+                "--dataset_format", "roboflow"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+            }
+        },
+        {
+            "name": "RF-DETR Train (Nano, 빠른 테스트)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "args": [
+                "--dataset_dir", "${input:datasetDir}",
+                "--model", "nano",
+                "--epochs", "10",
+                "--batch_size", "4",
+                "--output_dir", "output_nano",
+                "--dataset_format", "roboflow"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+            }
+        },
+        {
+            "name": "RF-DETR Train (Resume)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "args": [
+                "--dataset_dir", "${input:datasetDir}",
+                "--model", "base",
+                "--epochs", "100",
+                "--batch_size", "4",
+                "--output_dir", "output",
+                "--resume", "${input:checkpointPath}"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+            }
+        },
+        {
+            "name": "RF-DETR Train (YOLO 형식)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "args": [
+                "--dataset_dir", "${input:datasetDir}",
+                "--model", "base",
+                "--epochs", "100",
+                "--batch_size", "4",
+                "--output_dir", "output",
+                "--dataset_format", "yolo"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+            }
+        },
+        {
+            "name": "RF-DETR Train (Keypoint, COCO 17점)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "args": [
+                "--dataset_dir", "${input:datasetDir}",
+                "--model", "base",
+                "--epochs", "100",
+                "--batch_size", "4",
+                "--output_dir", "output_kpt",
+                "--dataset_format", "roboflow",
+                "--keypoint_head",
+                "--num_keypoints", "17"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+            }
+        },
+        {
+            "name": "RF-DETR Train (Keypoint, 커스텀 keypoint 수)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "args": [
+                "--dataset_dir", "${input:datasetDir}",
+                "--model", "base",
+                "--epochs", "100",
+                "--batch_size", "4",
+                "--output_dir", "output_kpt",
+                "--dataset_format", "roboflow",
+                "--keypoint_head",
+                "--num_keypoints", "${input:numKeypoints}",
+                "--keypoint_loss_coef", "5.0",
+                "--set_cost_keypoint", "5.0"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "datasetDir",
+            "type": "promptString",
+            "description": "데이터셋 경로 (COCO 또는 YOLO 형식)",
+            "default": "/path/to/your/dataset"
+        },
+        {
+            "id": "checkpointPath",
+            "type": "promptString",
+            "description": "이어서 훈련할 체크포인트 파일 경로",
+            "default": "output/checkpoint.pth"
+        },
+        {
+            "id": "numKeypoints",
+            "type": "promptString",
+            "description": "훈련할 keypoint 개수 (COCO 기본값: 17)",
+            "default": "17"
+        }
+    ]
+}

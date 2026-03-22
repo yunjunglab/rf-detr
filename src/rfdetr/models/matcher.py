@@ -48,12 +48,14 @@ class HungarianMatcher(nn.Module):
         mask_point_sample_ratio: int = 16,
         cost_mask_ce: float = 1,
         cost_mask_dice: float = 1,
+        cost_keypoint: float = 0,
     ):
         """Creates the matcher
         Params:
             cost_class: This is the relative weight of the classification error in the matching cost
             cost_bbox: This is the relative weight of the L1 error of the bounding box coordinates in the matching cost
             cost_giou: This is the relative weight of the giou loss of the bounding box in the matching cost
+            cost_keypoint: This is the relative weight of the keypoint L1 distance in the matching cost
         """
         super().__init__()
         self.cost_class = cost_class
@@ -64,6 +66,7 @@ class HungarianMatcher(nn.Module):
         self.mask_point_sample_ratio = mask_point_sample_ratio
         self.cost_mask_ce = cost_mask_ce
         self.cost_mask_dice = cost_mask_dice
+        self.cost_keypoint = cost_keypoint
 
     @torch.no_grad()
     def forward(self, outputs, targets, group_detr=1):
@@ -167,10 +170,34 @@ class HungarianMatcher(nn.Module):
             # Dice loss cost (1 - dice coefficient)
             cost_mask_dice = batch_dice_loss(pred_masks_logits, tgt_masks_flat)
 
+        # Keypoint matching cost: visibility-weighted mean L1 over all keypoints
+        keypoints_present = (
+            self.cost_keypoint > 0
+            and "pred_keypoints" in outputs
+            and all("keypoints" in t and t["keypoints"].shape[1] > 0 for t in targets)
+        )
+        if keypoints_present:
+            # pred_kpts: (B*Q, num_keypoints, 2) — normalized xy
+            pred_kpts = outputs["pred_keypoints"].flatten(0, 1)  # (B*Q, K, 2)
+            # tgt_kpts: (sum(N_i), K, 3) — normalized [x, y, visibility]
+            tgt_kpts = torch.cat([v["keypoints"] for v in targets])  # (T, K, 3)
+            tgt_kpts_xy = tgt_kpts[..., :2]   # (T, K, 2)
+            tgt_vis = tgt_kpts[..., 2]         # (T, K)
+            # Pairwise L1 over keypoints: (B*Q, T, K)
+            # pred_kpts[:, None]: (B*Q, 1, K, 2)  tgt_kpts_xy[None]: (1, T, K, 2)
+            diff = (pred_kpts[:, None, :, :] - tgt_kpts_xy[None, :, :, :]).abs()  # (B*Q, T, K, 2)
+            kpt_l1 = diff.sum(-1)  # (B*Q, T, K) — per-keypoint L1 distance
+            # Weight by visibility and average over visible keypoints per target
+            vis_mask = (tgt_vis > 0).float()  # (T, K)
+            vis_sum = vis_mask.sum(-1).clamp(min=1.0)  # (T,)
+            cost_kpt = (kpt_l1 * vis_mask[None]).sum(-1) / vis_sum[None]  # (B*Q, T)
+
         # Final cost matrix
         C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
         if masks_present:
             C = C + self.cost_mask_ce * cost_mask_ce + self.cost_mask_dice * cost_mask_dice
+        if keypoints_present:
+            C = C + self.cost_keypoint * cost_kpt
         C = C.view(bs, num_queries, -1).float().cpu()  # convert to float because bfloat16 doesn't play nicely with CPU
 
         # we assume any good match will not cause NaN or Inf, so we replace them with a large value
@@ -198,6 +225,7 @@ class HungarianMatcher(nn.Module):
 
 
 def build_matcher(args):
+    cost_keypoint = getattr(args, "set_cost_keypoint", 0)
     if args.segmentation_head:
         return HungarianMatcher(
             cost_class=args.set_cost_class,
@@ -207,6 +235,7 @@ def build_matcher(args):
             cost_mask_ce=args.mask_ce_loss_coef,
             cost_mask_dice=args.mask_dice_loss_coef,
             mask_point_sample_ratio=args.mask_point_sample_ratio,
+            cost_keypoint=cost_keypoint,
         )
     else:
         return HungarianMatcher(
@@ -214,4 +243,5 @@ def build_matcher(args):
             cost_bbox=args.set_cost_bbox,
             cost_giou=args.set_cost_giou,
             focal_alpha=args.focal_alpha,
+            cost_keypoint=cost_keypoint,
         )

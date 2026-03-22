@@ -72,6 +72,8 @@ class ModelConfig(BaseConfig):
     cls_loss_coef: float = 1.0
     segmentation_head: bool = False
     mask_downsample_ratio: int = 4
+    keypoint_head: bool = False
+    num_keypoints: int = 17
     license: str = "Apache-2.0"
 
     @field_validator("pretrain_weights", mode="after")
@@ -326,6 +328,10 @@ class TrainConfig(BaseModel):
     segmentation_head: bool = False
     eval_max_dets: int = 500
     aug_config: Optional[Dict[str, Any]] = None
+    keypoint_head: bool = False
+    num_keypoints: int = 17
+    keypoint_loss_coef: float = 5.0
+    set_cost_keypoint: float = 5.0
 
     @field_validator("dataset_dir", "output_dir", mode="after")
     @classmethod
