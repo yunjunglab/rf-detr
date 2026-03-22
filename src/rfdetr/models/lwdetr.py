@@ -970,7 +970,11 @@ class PostProcess(nn.Module):
                     kpts_i = out_kpts[i][k_idx]  # (num_select, num_keypoints, 2) — normalized
                     h_f, w_f = float(target_sizes[i][0]), float(target_sizes[i][1])
                     scale_kpt = torch.tensor([w_f, h_f], device=kpts_i.device, dtype=kpts_i.dtype)
-                    res_i["keypoints"] = kpts_i * scale_kpt  # absolute pixel coords
+                    kpts_xy = kpts_i * scale_kpt  # (num_select, K, 2) absolute pixel coords
+                    # Append visibility=2 (labeled and visible) so output matches COCO (x,y,v) format.
+                    # The model predicts xy only; v=2 marks every predicted keypoint as present.
+                    vis = torch.full((*kpts_xy.shape[:-1], 1), 2.0, device=kpts_xy.device, dtype=kpts_xy.dtype)
+                    res_i["keypoints"] = torch.cat([kpts_xy, vis], dim=-1)  # (num_select, K, 3)
                 results.append(res_i)
         else:
             for i, (s, l, b) in enumerate(zip(scores, labels, boxes)):
@@ -980,7 +984,9 @@ class PostProcess(nn.Module):
                     kpts_i = out_kpts[i][k_idx]  # (num_select, num_keypoints, 2)
                     h_f, w_f = float(target_sizes[i][0]), float(target_sizes[i][1])
                     scale_kpt = torch.tensor([w_f, h_f], device=kpts_i.device, dtype=kpts_i.dtype)
-                    res_i["keypoints"] = kpts_i * scale_kpt
+                    kpts_xy = kpts_i * scale_kpt  # (num_select, K, 2) absolute pixel coords
+                    vis = torch.full((*kpts_xy.shape[:-1], 1), 2.0, device=kpts_xy.device, dtype=kpts_xy.dtype)
+                    res_i["keypoints"] = torch.cat([kpts_xy, vis], dim=-1)  # (num_select, K, 3)
                 results.append(res_i)
 
         return results
