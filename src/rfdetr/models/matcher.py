@@ -185,7 +185,11 @@ class HungarianMatcher(nn.Module):
             tgt_vis = tgt_kpts[..., 2]         # (T, K)
             # Pairwise L1 over keypoints: (B*Q, T, K)
             # pred_kpts[:, None]: (B*Q, 1, K, 2)  tgt_kpts_xy[None]: (1, T, K, 2)
-            kpt_l1 = (pred_kpts[:, None] - tgt_kpts_xy[None]).abs().sum(-1)  # (B*Q, T, K)
+            # Use float16 on CUDA to halve the ~127 MB peak for this intermediate tensor.
+            if pred_kpts.is_cuda:
+                kpt_l1 = (pred_kpts.half()[:, None] - tgt_kpts_xy.half()[None]).abs().sum(-1).float()
+            else:
+                kpt_l1 = (pred_kpts[:, None] - tgt_kpts_xy[None]).abs().sum(-1)  # (B*Q, T, K)
             # Weight by visibility and average over visible keypoints per target
             vis_mask = (tgt_vis > 0).float()  # (T, K)
             vis_sum = vis_mask.sum(-1).clamp(min=1.0)  # (T,)

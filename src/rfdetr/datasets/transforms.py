@@ -118,6 +118,10 @@ GEOMETRIC_TRANSFORMS = {
 # Albumentations container/meta transforms that hold nested transforms
 ALBUMENTATIONS_CONTAINERS = frozenset({"OneOf", "SomeOf", "Sequential"})
 
+# Max keypoints per instance — must be larger than any realistic num_keypoints.
+# Used to encode (instance_idx, kpt_idx) as a single int: instance_idx * _MAX_KPTS + kpt_idx.
+_MAX_KPTS: int = 256
+
 
 def _is_geometric_transform(transform: A.BasicTransform) -> bool:
     """Return True if transform (or any nested transform) affects spatial coordinates.
@@ -415,11 +419,10 @@ class AlbumentationsWrapper:
         # Flatten keypoints (N, K, 3) → list of (x, y) for albumentations
         # Only pass originally-labeled keypoints (visibility > 0) to transform.
         # keypoint_labels encodes (instance_idx, kpt_idx) as instance_idx * _MAX_KPTS + kpt_idx.
-        _MAX_KPTS = 256  # larger than any realistic num_keypoints
         kpts_flat: List[Tuple[float, float]] = []
-        kpt_vis_dict: Dict[int, float] = {}  # encoded_label -> orig_visibility (O(1) lookup)
         kpt_labels_in: List[int] = []
         kpts_tensor: Optional[torch.Tensor] = None
+        kpts_np_raw: Optional[np.ndarray] = None
         num_keypoints: int = 0
         if "keypoints" in target:
             kpts_tensor = target["keypoints"]  # (N, K, 3)
@@ -432,10 +435,8 @@ class AlbumentationsWrapper:
                     labels_arr = inst_idxs * _MAX_KPTS + kpt_idxs
                     xs = kpts_np_raw[inst_idxs, kpt_idxs, 0]
                     ys = kpts_np_raw[inst_idxs, kpt_idxs, 1]
-                    vis_vals = kpts_np_raw[inst_idxs, kpt_idxs, 2]
                     kpts_flat = list(zip(xs.tolist(), ys.tolist()))
                     kpt_labels_in = labels_arr.tolist()
-                    kpt_vis_dict = dict(zip(labels_arr.tolist(), vis_vals.tolist()))
 
         # Apply transform
         transform_kwargs = {
@@ -478,16 +479,30 @@ class AlbumentationsWrapper:
             if kpts_tensor is not None:
                 n_kept = len(kept_idxs)
                 kpts_out_np = np.zeros((n_kept, num_keypoints, 3), dtype=np.float32)
-                orig_to_new = {orig: new for new, orig in enumerate(kept_idxs)}
                 kpts_transformed = augmented.get("keypoints", [])
                 kpt_labels_out = augmented.get("keypoint_labels", [])
-                for (x, y), label in zip(kpts_transformed, kpt_labels_out):
-                    orig_i = label // _MAX_KPTS
-                    kpt_k = label % _MAX_KPTS
-                    if orig_i in orig_to_new:
-                        new_i = orig_to_new[orig_i]
-                        orig_vis = kpt_vis_dict.get(label, 0.0)  # O(1) lookup
-                        kpts_out_np[new_i, kpt_k] = [x, y, orig_vis]
+                if kpts_transformed:
+                    # Build orig_idx → new_idx lookup array (O(1) vs dict)
+                    lookup = np.full(num_boxes, -1, dtype=np.intp)
+                    kept_arr = np.asarray(kept_idxs, dtype=np.intp)
+                    if len(kept_arr) > 0:
+                        lookup[kept_arr] = np.arange(n_kept, dtype=np.intp)
+                    # Vectorized reconstruction — no Python for-loop
+                    kpts_arr_out = np.array(kpts_transformed, dtype=np.float32)  # (V, 2)
+                    labels_arr_out = np.asarray(kpt_labels_out, dtype=np.intp)   # (V,)
+                    orig_is_out = labels_arr_out // _MAX_KPTS                    # (V,)
+                    kpt_ks_out = labels_arr_out % _MAX_KPTS                      # (V,)
+                    clipped = np.clip(orig_is_out, 0, num_boxes - 1)
+                    new_is_out = lookup[clipped]
+                    valid = (orig_is_out < num_boxes) & (new_is_out >= 0)
+                    if valid.any():
+                        ni = new_is_out[valid]
+                        kk = kpt_ks_out[valid]
+                        # Visibility comes directly from the raw input array — no dict needed
+                        vis = kpts_np_raw[orig_is_out[valid], kpt_ks_out[valid], 2]  # type: ignore[index]
+                        kpts_out_np[ni, kk, 0] = kpts_arr_out[valid, 0]
+                        kpts_out_np[ni, kk, 1] = kpts_arr_out[valid, 1]
+                        kpts_out_np[ni, kk, 2] = vis
                 target_out["keypoints"] = torch.as_tensor(kpts_out_np, dtype=torch.float32)
 
         image_out = Image.fromarray(augmented["image"])
