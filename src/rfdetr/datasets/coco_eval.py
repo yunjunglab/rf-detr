@@ -63,20 +63,29 @@ class CocoEvaluator(object):
 
     @staticmethod
     def _patch_keypoint_num(coco_gt: COCO) -> None:
-        """Add missing ``num_keypoints`` field to GT annotations.
+        """Add missing ``keypoints`` and ``num_keypoints`` fields to GT annotations.
 
-        pycocotools COCOeval._prepare() requires ``num_keypoints`` on every
-        annotation when iouType is ``"keypoints"``.  Some datasets omit this
-        field (it can be derived from the ``keypoints`` array), so we compute
-        and back-fill it here to avoid a KeyError at evaluation time.
+        pycocotools COCOeval requires both fields on every annotation when
+        iouType is ``"keypoints"``:
+        - ``_prepare()`` reads ``num_keypoints`` to decide ignore flags.
+        - ``computeOks()`` reads ``keypoints`` to compute OKS similarity.
 
-        ``num_keypoints`` is defined as the count of keypoints with visibility
-        > 0 (i.e. every third element of the flat ``keypoints`` list).
+        Some datasets omit these fields (e.g. crowd/non-person annotations).
+        We back-fill them here:
+        - ``keypoints`` defaults to all-zeros with length inferred from the
+          category definition (``num_keypoints`` field in the category), or
+          falls back to 0 if the category has no keypoint schema.
+        - ``num_keypoints`` is the count of keypoints with visibility > 0.
         """
+        # Build a map: category_id → number of keypoints from category schema
+        cat_num_kpts = {cat_id: len(cat.get("keypoints", [])) for cat_id, cat in coco_gt.cats.items()}
+
         for ann in coco_gt.anns.values():
+            if "keypoints" not in ann:
+                n_kpts = cat_num_kpts.get(ann.get("category_id", -1), 0)
+                ann["keypoints"] = [0] * (n_kpts * 3)
             if "num_keypoints" not in ann:
-                kpts = ann.get("keypoints", [])
-                # visibility values are at indices 2, 5, 8, … in the flat list
+                kpts = ann["keypoints"]
                 ann["num_keypoints"] = int(sum(1 for v in kpts[2::3] if v > 0))
 
     def _resolve_category_id(self, label: int, use_raw_category_ids: bool) -> Optional[int]:
