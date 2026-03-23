@@ -214,7 +214,8 @@ class Model:
         optimizer = torch.optim.AdamW(param_dicts, lr=args.lr, weight_decay=args.weight_decay)
         # Choose the learning rate scheduler based on the new argument
 
-        dataset_train = build_dataset(image_set="train", args=args, resolution=args.resolution)
+        train_split = getattr(args, "train_split", "train")
+        dataset_train = build_dataset(image_set=train_split, args=args, resolution=args.resolution)
         dataset_val = build_dataset(image_set="val", args=args, resolution=args.resolution)
         run_test = getattr(args, "run_test", True)
         if run_test:
@@ -1166,6 +1167,8 @@ def populate_args(
     num_keypoints=17,
     keypoint_loss_coef=5.0,
     set_cost_keypoint=5.0,
+    # Dataset split parameters
+    train_split="train",
     # Additional
     subcommand=None,
     **extra_kwargs,  # To handle any unexpected arguments
@@ -1272,6 +1275,7 @@ def populate_args(
         num_keypoints=num_keypoints,
         keypoint_loss_coef=keypoint_loss_coef,
         set_cost_keypoint=set_cost_keypoint,
+        train_split=train_split,
         **extra_kwargs,
     )
     return args

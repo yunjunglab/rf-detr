@@ -7,17 +7,24 @@
             "request": "launch",
             "program": "${workspaceFolder}/train.py",
             "args": [
-                "--dataset_dir", "${input:datasetDir}",
-                "--model", "base",
-                "--epochs", "100",
-                "--batch_size", "4",
-                "--output_dir", "output",
-                "--dataset_format", "roboflow"
+                "--dataset_dir",
+                "${input:datasetDir}",
+                "--model",
+                "base",
+                "--epochs",
+                "100",
+                "--batch_size",
+                "4",
+                "--output_dir",
+                "output",
+                "--dataset_format",
+                "roboflow"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+                "PYTHONPATH": "${workspaceFolder}/src"
             }
         },
         {
@@ -26,37 +33,52 @@
             "request": "launch",
             "program": "${workspaceFolder}/train.py",
             "args": [
-                "--dataset_dir", "${input:datasetDir}",
-                "--model", "large",
-                "--epochs", "100",
-                "--batch_size", "2",
-                "--grad_accum_steps", "8",
-                "--output_dir", "output",
-                "--dataset_format", "roboflow"
+                "--dataset_dir",
+                "${input:datasetDir}",
+                "--model",
+                "large",
+                "--epochs",
+                "100",
+                "--batch_size",
+                "2",
+                "--grad_accum_steps",
+                "8",
+                "--output_dir",
+                "output",
+                "--dataset_format",
+                "roboflow"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+                "PYTHONPATH": "${workspaceFolder}/src"
             }
         },
         {
-            "name": "RF-DETR Train (Nano, 빠른 테스트)",
+            "name": "RF-DETR Train (Nano, \ube60\ub978 \ud14c\uc2a4\ud2b8)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/train.py",
             "args": [
-                "--dataset_dir", "${input:datasetDir}",
-                "--model", "nano",
-                "--epochs", "10",
-                "--batch_size", "4",
-                "--output_dir", "output_nano",
-                "--dataset_format", "roboflow"
+                "--dataset_dir",
+                "${input:datasetDir}",
+                "--model",
+                "nano",
+                "--epochs",
+                "10",
+                "--batch_size",
+                "4",
+                "--output_dir",
+                "output_nano",
+                "--dataset_format",
+                "roboflow"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+                "PYTHONPATH": "${workspaceFolder}/src"
             }
         },
         {
@@ -65,80 +87,140 @@
             "request": "launch",
             "program": "${workspaceFolder}/train.py",
             "args": [
-                "--dataset_dir", "${input:datasetDir}",
-                "--model", "base",
-                "--epochs", "100",
-                "--batch_size", "4",
-                "--output_dir", "output",
-                "--resume", "${input:checkpointPath}"
+                "--dataset_dir",
+                "${input:datasetDir}",
+                "--model",
+                "base",
+                "--epochs",
+                "100",
+                "--batch_size",
+                "4",
+                "--output_dir",
+                "output",
+                "--resume",
+                "${input:checkpointPath}"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+                "PYTHONPATH": "${workspaceFolder}/src"
             }
         },
         {
-            "name": "RF-DETR Train (YOLO 형식)",
+            "name": "RF-DETR Train (YOLO \ud615\uc2dd)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/train.py",
             "args": [
-                "--dataset_dir", "${input:datasetDir}",
-                "--model", "base",
-                "--epochs", "100",
-                "--batch_size", "4",
-                "--output_dir", "output",
-                "--dataset_format", "yolo"
+                "--dataset_dir",
+                "${input:datasetDir}",
+                "--model",
+                "base",
+                "--epochs",
+                "100",
+                "--batch_size",
+                "4",
+                "--output_dir",
+                "output",
+                "--dataset_format",
+                "yolo"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+                "PYTHONPATH": "${workspaceFolder}/src"
             }
         },
         {
-            "name": "RF-DETR Train (Keypoint, COCO 17점)",
+            "name": "RF-DETR Train (val split\uc73c\ub85c \ube60\ub978 \ud6c8\ub828 \ud14c\uc2a4\ud2b8)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/train.py",
             "args": [
-                "--dataset_dir", "${input:datasetDir}",
-                "--model", "base",
-                "--epochs", "100",
-                "--batch_size", "4",
-                "--output_dir", "output_kpt",
-                "--dataset_format", "roboflow",
+                "--dataset_dir",
+                "${input:datasetDir}",
+                "--model",
+                "nano",
+                "--epochs",
+                "3",
+                "--batch_size",
+                "4",
+                "--output_dir",
+                "output_test",
+                "--dataset_format",
+                "roboflow",
+                "--train_split",
+                "val"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+                "PYTHONPATH": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "name": "RF-DETR Train (Keypoint, COCO 17\uc810)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "args": [
+                "--dataset_dir",
+                "${input:datasetDir}",
+                "--model",
+                "base",
+                "--epochs",
+                "100",
+                "--batch_size",
+                "4",
+                "--output_dir",
+                "output_kpt",
+                "--dataset_format",
+                "roboflow",
                 "--keypoint_head",
-                "--num_keypoints", "17"
+                "--num_keypoints",
+                "17"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+                "PYTHONPATH": "${workspaceFolder}/src"
             }
         },
         {
-            "name": "RF-DETR Train (Keypoint, 커스텀 keypoint 수)",
+            "name": "RF-DETR Train (Keypoint, \ucee4\uc2a4\ud140 keypoint \uc218)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/train.py",
             "args": [
-                "--dataset_dir", "${input:datasetDir}",
-                "--model", "base",
-                "--epochs", "100",
-                "--batch_size", "4",
-                "--output_dir", "output_kpt",
-                "--dataset_format", "roboflow",
+                "--dataset_dir",
+                "${input:datasetDir}",
+                "--model",
+                "base",
+                "--epochs",
+                "100",
+                "--batch_size",
+                "4",
+                "--output_dir",
+                "output_kpt",
+                "--dataset_format",
+                "roboflow",
                 "--keypoint_head",
-                "--num_keypoints", "${input:numKeypoints}",
-                "--keypoint_loss_coef", "5.0",
-                "--set_cost_keypoint", "5.0"
+                "--num_keypoints",
+                "${input:numKeypoints}",
+                "--keypoint_loss_coef",
+                "5.0",
+                "--set_cost_keypoint",
+                "5.0"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+                "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+                "PYTHONPATH": "${workspaceFolder}/src"
             }
         }
     ],
@@ -146,19 +228,19 @@
         {
             "id": "datasetDir",
             "type": "promptString",
-            "description": "데이터셋 경로 (COCO 또는 YOLO 형식)",
+            "description": "\ub370\uc774\ud130\uc14b \uacbd\ub85c (COCO \ub610\ub294 YOLO \ud615\uc2dd)",
             "default": "/path/to/your/dataset"
         },
         {
             "id": "checkpointPath",
             "type": "promptString",
-            "description": "이어서 훈련할 체크포인트 파일 경로",
+            "description": "\uc774\uc5b4\uc11c \ud6c8\ub828\ud560 \uccb4\ud06c\ud3ec\uc778\ud2b8 \ud30c\uc77c \uacbd\ub85c",
             "default": "output/checkpoint.pth"
         },
         {
             "id": "numKeypoints",
             "type": "promptString",
-            "description": "훈련할 keypoint 개수 (COCO 기본값: 17)",
+            "description": "\ud6c8\ub828\ud560 keypoint \uac1c\uc218 (COCO \uae30\ubcf8\uac12: 17)",
             "default": "17"
         }
     ]
