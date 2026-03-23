@@ -529,7 +529,10 @@ def make_coco_transforms_square_div_64(
 
 
 def build_coco(image_set: str, args: Any, resolution: int) -> CocoDetection:
-    root = Path(args.coco_path)
+    coco_path = getattr(args, "coco_path", None) or getattr(args, "dataset_dir", None)
+    if coco_path is None:
+        raise ValueError("Either --coco_path or --dataset_dir must be provided for COCO dataset")
+    root = Path(coco_path)
     if not root.exists():
         logger.error(f"COCO path {root} does not exist")
         raise FileNotFoundError(f"COCO path {root} does not exist")
