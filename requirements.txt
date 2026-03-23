@@ -1,0 +1,50 @@
+# ------------------------------------------------------------------------
+# RF-DETR
+# Copyright (c) 2025 Roboflow. All Rights Reserved.
+# Licensed under the Apache License, Version 2.0 [see LICENSE for details]
+# ------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------
+# Core dependencies
+# Install PyTorch separately first (see README / version notes below):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# -----------------------------------------------------------------------
+
+torch>=2.0.0,<=2.8.0
+torchvision>=0.15.0
+
+# NLP / fine-tuning
+transformers>4.0.0,<5.0.0
+peft
+
+# Object detection utilities
+pycocotools
+supervision
+
+# Data / augmentation
+albumentations>=1.0.0,<2.0.0
+scipy
+numpy
+
+# Dataset / training utilities
+rf100vl
+roboflow
+requests
+tqdm
+matplotlib
+pydantic
+
+# -----------------------------------------------------------------------
+# Optional extras
+# -----------------------------------------------------------------------
+
+# Metrics logging (uncomment as needed)
+# tensorboard>=2.13.0
+# wandb
+# mlflow
+# clearml
+
+# ONNX export (uncomment as needed)
+# onnx>=1.16.0,<1.20
+# onnxsim<0.6.0
+# onnxruntime
