@@ -279,7 +279,9 @@ class Model:
                 )
                 num_workers = 0
 
-        if len(dataset_train) < effective_batch_size * min_batches:
+        if len(dataset_train) < effective_batch_size * min_batches and not args.distributed:
+            # Replacement sampler is not compatible with DistributedSampler; skip for
+            # multi-GPU runs and fall through to the standard distributed-aware path.
             logger.info(
                 f"Training with uniform sampler because dataset is too small: {len(dataset_train)} < {effective_batch_size * min_batches}"
             )
@@ -356,7 +358,8 @@ class Model:
                 args.start_epoch - 1,
                 args.epochs,
             )
-            _run_on_train_end_callbacks(callbacks)
+            if is_main_process():
+                _run_on_train_end_callbacks(callbacks)
             return
 
         if args.eval:
@@ -558,8 +561,19 @@ class Model:
                             else:
                                 torch.save(coco_evaluator.coco_eval["segm"].eval, output_dir / "eval" / name)
 
-            for callback in callbacks["on_fit_epoch_end"]:
-                callback(log_stats)
+            # Logging callbacks (WandB/TB/plots) must only run on rank 0 to avoid
+            # duplicate writes and external-service conflicts in distributed training.
+            if is_main_process():
+                for callback in callbacks["on_fit_epoch_end"]:
+                    callback(log_stats)
+
+            # Broadcast early-stopping decision from rank 0 to all ranks so that
+            # every process breaks out of the training loop together.
+            if args.distributed:
+                stop_tensor = torch.tensor([int(self.stop_early)], dtype=torch.int32, device=device)
+                torch.distributed.broadcast(stop_tensor, src=0)
+                if stop_tensor.item():
+                    self.stop_early = True
 
             if self.stop_early:
                 logger.info(f"Early stopping requested, stopping at epoch {epoch}")
@@ -618,32 +632,34 @@ class Model:
 
             test_stats, _ = evaluate(model, criterion, postprocess, data_loader_test, base_ds_test, device, args=args)
             logger.info(f"Test results: {test_stats}")
-            with open(output_dir / "results.json", "r") as f:
-                results = json.load(f)
-            test_metrics = test_stats["results_json"]["class_map"]
-            results["class_map"]["test"] = test_metrics
-            with open(output_dir / "results.json", "w") as f:
-                json.dump(results, f)
+            if is_main_process():
+                with open(output_dir / "results.json", "r") as f:
+                    results = json.load(f)
+                test_metrics = test_stats["results_json"]["class_map"]
+                results["class_map"]["test"] = test_metrics
+                with open(output_dir / "results.json", "w") as f:
+                    json.dump(results, f)
 
-            # Save mask results if they exist (read-modify-write to preserve valid split data)
-            if "results_json_masks" in test_stats:
-                test_mask_results = test_stats["results_json_masks"]
-                test_mask_class_map = test_mask_results["class_map"]
-                results_mask_path = output_dir / "results_mask.json"
-                if results_mask_path.exists():
-                    with open(results_mask_path, "r") as f:
-                        results_mask = json.load(f)
-                else:
-                    # Initialize with top-level scalar metrics (e.g., map, precision, recall, f1_score)
-                    # and an empty class_map, mirroring the structure from the validation phase.
-                    results_mask = {k: v for k, v in test_mask_results.items() if k != "class_map"}
-                    results_mask["class_map"] = {}
-                results_mask["class_map"]["test"] = test_mask_class_map
-                with open(results_mask_path, "w") as f:
-                    json.dump(results_mask, f)
-                logger.info("Mask results saved to %s", results_mask_path)
+                # Save mask results if they exist (read-modify-write to preserve valid split data)
+                if "results_json_masks" in test_stats:
+                    test_mask_results = test_stats["results_json_masks"]
+                    test_mask_class_map = test_mask_results["class_map"]
+                    results_mask_path = output_dir / "results_mask.json"
+                    if results_mask_path.exists():
+                        with open(results_mask_path, "r") as f:
+                            results_mask = json.load(f)
+                    else:
+                        # Initialize with top-level scalar metrics (e.g., map, precision, recall, f1_score)
+                        # and an empty class_map, mirroring the structure from the validation phase.
+                        results_mask = {k: v for k, v in test_mask_results.items() if k != "class_map"}
+                        results_mask["class_map"] = {}
+                    results_mask["class_map"]["test"] = test_mask_class_map
+                    with open(results_mask_path, "w") as f:
+                        json.dump(results_mask, f)
+                    logger.info("Mask results saved to %s", results_mask_path)
 
-        _run_on_train_end_callbacks(callbacks)
+        if is_main_process():
+            _run_on_train_end_callbacks(callbacks)
 
     def export(
         self,
