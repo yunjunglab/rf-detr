@@ -451,16 +451,20 @@ def patched_pycocotools_summarize(self):
 
     def _summarizeKps():
         stats = np.zeros((10,))
-        stats[0] = _summarize(1, maxDets=20)
-        stats[1] = _summarize(1, maxDets=20, iouThr=0.5)
-        stats[2] = _summarize(1, maxDets=20, iouThr=0.75)
-        stats[3] = _summarize(1, maxDets=20, areaRng="medium")
-        stats[4] = _summarize(1, maxDets=20, areaRng="large")
-        stats[5] = _summarize(0, maxDets=20)
-        stats[6] = _summarize(0, maxDets=20, iouThr=0.5)
-        stats[7] = _summarize(0, maxDets=20, iouThr=0.75)
-        stats[8] = _summarize(0, maxDets=20, areaRng="medium")
-        stats[9] = _summarize(0, maxDets=20, areaRng="large")
+        # Use the configured maxDets[-1] (matches how _summarizeDets works).
+        # pycocotools hardcodes 20 here, but our evaluator uses [1, 10, max_dets]
+        # so maxDets=20 would produce an empty index → all -1.
+        md = self.params.maxDets[-1]
+        stats[0] = _summarize(1, maxDets=md)
+        stats[1] = _summarize(1, maxDets=md, iouThr=0.5)
+        stats[2] = _summarize(1, maxDets=md, iouThr=0.75)
+        stats[3] = _summarize(1, maxDets=md, areaRng="medium")
+        stats[4] = _summarize(1, maxDets=md, areaRng="large")
+        stats[5] = _summarize(0, maxDets=md)
+        stats[6] = _summarize(0, maxDets=md, iouThr=0.5)
+        stats[7] = _summarize(0, maxDets=md, iouThr=0.75)
+        stats[8] = _summarize(0, maxDets=md, areaRng="medium")
+        stats[9] = _summarize(0, maxDets=md, areaRng="large")
         return stats
 
     if not self.eval:
