@@ -49,6 +49,8 @@ class CocoEvaluator(object):
         self.label2cat: Dict[int, int] | None = getattr(coco_gt, "label2cat", None)
 
         self.iou_types = iou_types
+        if "keypoints" in iou_types:
+            self._patch_keypoint_num(coco_gt)
         self.coco_eval = {}
         for iou_type in iou_types:
             self.coco_eval[iou_type] = COCOeval(coco_gt, iouType=iou_type)
@@ -58,6 +60,24 @@ class CocoEvaluator(object):
         self.eval_imgs: Dict[str, List[COCOeval]] = {k: [] for k in iou_types}
         self.cat_ids = set(coco_gt.cats.keys())
         self._prefer_raw_category_ids = False
+
+    @staticmethod
+    def _patch_keypoint_num(coco_gt: COCO) -> None:
+        """Add missing ``num_keypoints`` field to GT annotations.
+
+        pycocotools COCOeval._prepare() requires ``num_keypoints`` on every
+        annotation when iouType is ``"keypoints"``.  Some datasets omit this
+        field (it can be derived from the ``keypoints`` array), so we compute
+        and back-fill it here to avoid a KeyError at evaluation time.
+
+        ``num_keypoints`` is defined as the count of keypoints with visibility
+        > 0 (i.e. every third element of the flat ``keypoints`` list).
+        """
+        for ann in coco_gt.anns.values():
+            if "num_keypoints" not in ann:
+                kpts = ann.get("keypoints", [])
+                # visibility values are at indices 2, 5, 8, … in the flat list
+                ann["num_keypoints"] = int(sum(1 for v in kpts[2::3] if v > 0))
 
     def _resolve_category_id(self, label: int, use_raw_category_ids: bool) -> Optional[int]:
         """Resolve a predicted label to a COCO category_id.
