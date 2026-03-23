@@ -168,7 +168,7 @@
             "program": "${workspaceFolder}/train.py",
             "args": [
                 "--dataset_dir",
-                "${input:datasetDir}",
+                "${input:cocoDatasetDir}",
                 "--model",
                 "base",
                 "--epochs",
@@ -178,7 +178,7 @@
                 "--output_dir",
                 "output_kpt",
                 "--dataset_format",
-                "roboflow",
+                "coco",
                 "--keypoint_head",
                 "--num_keypoints",
                 "17"
@@ -197,7 +197,7 @@
             "program": "${workspaceFolder}/train.py",
             "args": [
                 "--dataset_dir",
-                "${input:datasetDir}",
+                "${input:cocoDatasetDir}",
                 "--model",
                 "base",
                 "--epochs",
@@ -207,7 +207,7 @@
                 "--output_dir",
                 "output_kpt",
                 "--dataset_format",
-                "roboflow",
+                "coco",
                 "--keypoint_head",
                 "--num_keypoints",
                 "${input:numKeypoints}",
@@ -230,6 +230,12 @@
             "type": "promptString",
             "description": "\ub370\uc774\ud130\uc14b \uacbd\ub85c (COCO \ub610\ub294 YOLO \ud615\uc2dd)",
             "default": "/path/to/your/dataset"
+        },
+        {
+            "id": "cocoDatasetDir",
+            "type": "promptString",
+            "description": "COCO keypoint \ub370\uc774\ud130\uc14b \ub8e8\ud2b8 \uacbd\ub85c (train2017/, val2017/, annotations/ \ud3ec\ud568)",
+            "default": "/work/yjkim/Project/rf-detr_keypoint_cline/coco_keypoints_dataset"
         },
         {
             "id": "checkpointPath",
