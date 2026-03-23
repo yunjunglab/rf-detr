@@ -537,7 +537,28 @@ def build_coco(image_set: str, args: Any, resolution: int) -> CocoDetection:
         logger.error(f"COCO path {root} does not exist")
         raise FileNotFoundError(f"COCO path {root} does not exist")
 
-    mode = "instances"
+    square_resize_div_64 = getattr(args, "square_resize_div_64", False)
+    include_masks = getattr(args, "segmentation_head", False)
+    include_keypoints = getattr(args, "keypoint_head", False)
+    aug_config = getattr(args, "aug_config", None)
+
+    # Standard COCO keypoint annotations are in person_keypoints_*.json,
+    # not instances_*.json.  Switch annotation files when loading keypoints.
+    if include_keypoints:
+        kpt_ann_train = root / "annotations" / "person_keypoints_train2017.json"
+        kpt_ann_val = root / "annotations" / "person_keypoints_val2017.json"
+        if kpt_ann_train.exists() or kpt_ann_val.exists():
+            mode = "person_keypoints"
+        else:
+            logger.warning(
+                "person_keypoints_*.json not found under annotations/; "
+                "falling back to instances_*.json. "
+                "Keypoint AP/AR may be -1 if annotations lack 'keypoints' fields."
+            )
+            mode = "instances"
+    else:
+        mode = "instances"
+
     PATHS = {
         "train": (root / "train2017", root / "annotations" / f"{mode}_train2017.json"),
         "val": (root / "val2017", root / "annotations" / f"{mode}_val2017.json"),
@@ -545,11 +566,6 @@ def build_coco(image_set: str, args: Any, resolution: int) -> CocoDetection:
     }
 
     img_folder, ann_file = PATHS[image_set.split("_")[0]]
-
-    square_resize_div_64 = getattr(args, "square_resize_div_64", False)
-    include_masks = getattr(args, "segmentation_head", False)
-    include_keypoints = getattr(args, "keypoint_head", False)
-    aug_config = getattr(args, "aug_config", None)
 
     if square_resize_div_64:
         logger.info(f"Building COCO {image_set} dataset with square resize at resolution {resolution}")

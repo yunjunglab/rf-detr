@@ -39,7 +39,13 @@ logger = get_logger()
 
 
 class CocoEvaluator(object):
-    def __init__(self, coco_gt: COCO, iou_types: List[str], max_dets: int = 100) -> None:
+    # Default COCO 17-keypoint OKS sigmas (Ronchi & Perona, 2017).
+    _COCO17_SIGMAS = (
+        np.array([0.26, 0.25, 0.25, 0.35, 0.35, 0.79, 0.79, 0.72, 0.72, 0.62, 0.62, 1.07, 1.07, 0.87, 0.87, 0.89, 0.89])
+        / 10.0
+    )
+
+    def __init__(self, coco_gt: COCO, iou_types: List[str], max_dets: int = 100, num_keypoints: int = 17) -> None:
         assert isinstance(iou_types, (list, tuple))
         coco_gt = copy.deepcopy(coco_gt)
         self.coco_gt = coco_gt
@@ -55,6 +61,13 @@ class CocoEvaluator(object):
         for iou_type in iou_types:
             self.coco_eval[iou_type] = COCOeval(coco_gt, iouType=iou_type)
             self.coco_eval[iou_type].params.maxDets = [1, 10, max_dets]
+            if iou_type == "keypoints":
+                # pycocotools hard-codes 17-keypoint sigmas; override for custom counts.
+                if num_keypoints == 17:
+                    self.coco_eval[iou_type].params.kpt_oks_sigmas = self._COCO17_SIGMAS
+                else:
+                    # Uniform sigmas for non-standard keypoint sets.
+                    self.coco_eval[iou_type].params.kpt_oks_sigmas = np.full(num_keypoints, 0.05)
 
         self.img_ids: List[int] = []
         self.eval_imgs: Dict[str, List[COCOeval]] = {k: [] for k in iou_types}
