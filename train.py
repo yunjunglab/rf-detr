@@ -132,6 +132,13 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="WandB 런 이름",
     )
+    parser.add_argument(
+        "--train_split",
+        type=str,
+        default="train",
+        choices=["train", "val"],
+        help="훈련에 사용할 데이터 분할 (기본값: train, val로 설정하면 검증 데이터로 훈련 가능)",
+    )
     # Keypoint arguments
     parser.add_argument(
         "--keypoint_head",
@@ -190,6 +197,7 @@ def main() -> None:
         early_stopping=args.early_stopping,
         project=args.project,
         run=args.run,
+        train_split=args.train_split,
     )
     if args.keypoint_head:
         train_kwargs["keypoint_head"] = True

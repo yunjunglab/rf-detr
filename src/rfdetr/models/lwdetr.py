@@ -211,9 +211,7 @@ class LWDETR(nn.Module):
 
             if self.keypoint_head:
                 outputs_kpts = self.keypoint_embed(hs).sigmoid()
-                outputs_kpts = outputs_kpts.reshape(
-                    *outputs_kpts.shape[:3], self.num_keypoints, 2
-                )
+                outputs_kpts = outputs_kpts.reshape(*outputs_kpts.shape[:3], self.num_keypoints, 2)
 
             out = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord[-1]}
             if self.segmentation_head is not None:
@@ -721,7 +719,7 @@ class SetCriterion(nn.Module):
         for i, (t, (src_idx, tgt_idx)) in enumerate(zip(targets, indices)):
             if "keypoints" not in t or t["keypoints"].shape[1] == 0 or len(tgt_idx) == 0:
                 continue
-            src_kpts_list.append(pred_kpts[i][src_idx])    # (n, K, 2)
+            src_kpts_list.append(pred_kpts[i][src_idx])  # (n, K, 2)
             tgt_kpts_list.append(t["keypoints"][tgt_idx])  # (n, K, 3)
 
         if not src_kpts_list:
