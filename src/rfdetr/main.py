@@ -84,7 +84,11 @@ class Model:
         self.args = args
         self.resolution = args.resolution
         self.model = build_model(args)
-        self.device = torch.device(args.device)
+        local_rank = int(os.environ.get("LOCAL_RANK", -1))
+        if local_rank >= 0 and args.device == "cuda":
+            self.device = torch.device(f"cuda:{local_rank}")
+        else:
+            self.device = torch.device(args.device)
         if args.pretrain_weights is not None:
             logger.info("Loading pretrain weights")
 
