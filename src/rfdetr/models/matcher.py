@@ -181,8 +181,8 @@ class HungarianMatcher(nn.Module):
             pred_kpts = outputs["pred_keypoints"].flatten(0, 1)  # (B*Q, K, 2)
             # tgt_kpts: (sum(N_i), K, 3) — normalized [x, y, visibility]
             tgt_kpts = torch.cat([v["keypoints"] for v in targets])  # (T, K, 3)
-            tgt_kpts_xy = tgt_kpts[..., :2]   # (T, K, 2)
-            tgt_vis = tgt_kpts[..., 2]         # (T, K)
+            tgt_kpts_xy = tgt_kpts[..., :2]  # (T, K, 2)
+            tgt_vis = tgt_kpts[..., 2]  # (T, K)
             # Pairwise L1 over keypoints: (B*Q, T, K)
             # pred_kpts[:, None]: (B*Q, 1, K, 2)  tgt_kpts_xy[None]: (1, T, K, 2)
             # Use float16 on CUDA to halve the ~127 MB peak for this intermediate tensor.

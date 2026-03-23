@@ -489,9 +489,9 @@ class AlbumentationsWrapper:
                         lookup[kept_arr] = np.arange(n_kept, dtype=np.intp)
                     # Vectorized reconstruction — no Python for-loop
                     kpts_arr_out = np.array(kpts_transformed, dtype=np.float32)  # (V, 2)
-                    labels_arr_out = np.asarray(kpt_labels_out, dtype=np.intp)   # (V,)
-                    orig_is_out = labels_arr_out // _MAX_KPTS                    # (V,)
-                    kpt_ks_out = labels_arr_out % _MAX_KPTS                      # (V,)
+                    labels_arr_out = np.asarray(kpt_labels_out, dtype=np.intp)  # (V,)
+                    orig_is_out = labels_arr_out // _MAX_KPTS  # (V,)
+                    kpt_ks_out = labels_arr_out % _MAX_KPTS  # (V,)
                     clipped = np.clip(orig_is_out, 0, num_boxes - 1)
                     new_is_out = lookup[clipped]
                     valid = (orig_is_out < num_boxes) & (new_is_out >= 0)
