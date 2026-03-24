@@ -176,6 +176,13 @@ def main() -> None:
     if args.keypoint_head:
         logger.info(f"Keypoint 훈련 활성화: num_keypoints={args.num_keypoints}")
 
+    # output_dir에 checkpoint.pth가 있으면 자동으로 이어서 훈련
+    if args.resume is None:
+        auto_resume_path = os.path.join(args.output_dir, "checkpoint.pth")
+        if os.path.isfile(auto_resume_path):
+            logger.info(f"이전 체크포인트 발견, 자동 이어서 훈련: {auto_resume_path}")
+            args.resume = auto_resume_path
+
     model_cls = MODEL_MAP[args.model]
     model = model_cls(keypoint_head=args.keypoint_head, num_keypoints=args.num_keypoints)
 
