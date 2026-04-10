@@ -440,7 +440,10 @@ def evaluate(model, criterion, postprocess, data_loader, base_ds, device, args=N
         iou_types.append("keypoints")
     iou_types = tuple(iou_types)
     num_keypoints = getattr(args, "num_keypoints", 17)
-    coco_evaluator = CocoEvaluator(base_ds, iou_types, args.eval_max_dets, num_keypoints=num_keypoints)
+    kpt_oks_sigmas = getattr(args, "keypoint_oks_sigmas", None)
+    coco_evaluator = CocoEvaluator(
+        base_ds, iou_types, args.eval_max_dets, num_keypoints=num_keypoints, kpt_oks_sigmas=kpt_oks_sigmas
+    )
 
     print_freq = args.print_freq if args is not None else 10
     use_progress_bar = bool(getattr(args, "progress_bar", False))

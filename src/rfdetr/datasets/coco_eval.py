@@ -45,7 +45,14 @@ class CocoEvaluator(object):
         / 10.0
     )
 
-    def __init__(self, coco_gt: COCO, iou_types: List[str], max_dets: int = 100, num_keypoints: int = 17) -> None:
+    def __init__(
+        self,
+        coco_gt: COCO,
+        iou_types: List[str],
+        max_dets: int = 100,
+        num_keypoints: int = 17,
+        kpt_oks_sigmas: Optional[List[float]] = None,
+    ) -> None:
         assert isinstance(iou_types, (list, tuple))
         coco_gt = copy.deepcopy(coco_gt)
         self.coco_gt = coco_gt
@@ -62,8 +69,18 @@ class CocoEvaluator(object):
             self.coco_eval[iou_type] = COCOeval(coco_gt, iouType=iou_type)
             self.coco_eval[iou_type].params.maxDets = [1, 10, max_dets]
             if iou_type == "keypoints":
-                # pycocotools hard-codes 17-keypoint sigmas; override for custom counts.
-                if num_keypoints == 17:
+                # Resolve OKS sigmas:
+                # 1) User-supplied sigmas take priority.
+                # 2) Fall back to COCO17 standard sigmas for 17-keypoint datasets.
+                # 3) Use uniform 0.05 for any other keypoint count.
+                if kpt_oks_sigmas is not None:
+                    if len(kpt_oks_sigmas) != num_keypoints:
+                        raise ValueError(
+                            f"keypoint_oks_sigmas length ({len(kpt_oks_sigmas)}) "
+                            f"must match num_keypoints ({num_keypoints})."
+                        )
+                    self.coco_eval[iou_type].params.kpt_oks_sigmas = np.array(kpt_oks_sigmas, dtype=np.float64)
+                elif num_keypoints == 17:
                     self.coco_eval[iou_type].params.kpt_oks_sigmas = self._COCO17_SIGMAS
                 else:
                     # Uniform sigmas for non-standard keypoint sets.

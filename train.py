@@ -163,6 +163,15 @@ def parse_args() -> argparse.Namespace:
         default=5.0,
         help="헝가리안 매칭의 keypoint 비용 가중치 (기본값: 5.0)",
     )
+    parser.add_argument(
+        "--keypoint_oks_sigmas",
+        type=float,
+        nargs="+",
+        default=None,
+        help="keypoint별 OKS sigma 값 목록 (개수는 --num_keypoints와 일치해야 함). "
+             "미지정 시 17-keypoint는 COCO 표준값, 그 외는 균일 0.05 사용. "
+             "예: --keypoint_oks_sigmas 0.05 0.05 0.07 0.07",
+    )
     return parser.parse_args()
 
 

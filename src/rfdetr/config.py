@@ -332,6 +332,7 @@ class TrainConfig(BaseModel):
     num_keypoints: int = 17
     keypoint_loss_coef: float = 5.0
     set_cost_keypoint: float = 5.0
+    keypoint_oks_sigmas: Optional[List[float]] = None
 
     @field_validator("dataset_dir", "output_dir", mode="after")
     @classmethod
