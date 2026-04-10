@@ -194,6 +194,49 @@ class MetricsTensorBoardSink:
             if ema_ar50_90 is not None:
                 self.writer.add_scalar("Metrics/EMA/AR50_90", ema_ar50_90, epoch)
 
+        # Keypoint metrics (indices: 0=AP, 1=AP50, 2=AP75, 5=AR, 6=AR50, 7=AR75)
+        if "test_coco_eval_keypoints" in values:
+            kp_eval = values["test_coco_eval_keypoints"]
+            kp_ap50_90 = safe_index(kp_eval, 0)
+            kp_ap50 = safe_index(kp_eval, 1)
+            kp_ap75 = safe_index(kp_eval, 2)
+            kp_ar50_90 = safe_index(kp_eval, 5)
+            kp_ar50 = safe_index(kp_eval, 6)
+            kp_ar75 = safe_index(kp_eval, 7)
+            if kp_ap50_90 is not None:
+                self.writer.add_scalar("Keypoints/Base/AP50_90", kp_ap50_90, epoch)
+            if kp_ap50 is not None:
+                self.writer.add_scalar("Keypoints/Base/AP50", kp_ap50, epoch)
+            if kp_ap75 is not None:
+                self.writer.add_scalar("Keypoints/Base/AP75", kp_ap75, epoch)
+            if kp_ar50_90 is not None:
+                self.writer.add_scalar("Keypoints/Base/AR50_90", kp_ar50_90, epoch)
+            if kp_ar50 is not None:
+                self.writer.add_scalar("Keypoints/Base/AR50", kp_ar50, epoch)
+            if kp_ar75 is not None:
+                self.writer.add_scalar("Keypoints/Base/AR75", kp_ar75, epoch)
+
+        if "ema_test_coco_eval_keypoints" in values:
+            ema_kp_eval = values["ema_test_coco_eval_keypoints"]
+            ema_kp_ap50_90 = safe_index(ema_kp_eval, 0)
+            ema_kp_ap50 = safe_index(ema_kp_eval, 1)
+            ema_kp_ap75 = safe_index(ema_kp_eval, 2)
+            ema_kp_ar50_90 = safe_index(ema_kp_eval, 5)
+            ema_kp_ar50 = safe_index(ema_kp_eval, 6)
+            ema_kp_ar75 = safe_index(ema_kp_eval, 7)
+            if ema_kp_ap50_90 is not None:
+                self.writer.add_scalar("Keypoints/EMA/AP50_90", ema_kp_ap50_90, epoch)
+            if ema_kp_ap50 is not None:
+                self.writer.add_scalar("Keypoints/EMA/AP50", ema_kp_ap50, epoch)
+            if ema_kp_ap75 is not None:
+                self.writer.add_scalar("Keypoints/EMA/AP75", ema_kp_ap75, epoch)
+            if ema_kp_ar50_90 is not None:
+                self.writer.add_scalar("Keypoints/EMA/AR50_90", ema_kp_ar50_90, epoch)
+            if ema_kp_ar50 is not None:
+                self.writer.add_scalar("Keypoints/EMA/AR50", ema_kp_ar50, epoch)
+            if ema_kp_ar75 is not None:
+                self.writer.add_scalar("Keypoints/EMA/AR75", ema_kp_ar75, epoch)
+
         self.writer.flush()
 
     def close(self):
@@ -262,6 +305,49 @@ class MetricsWandBSink:
                 log_dict["Metrics/EMA/AP50"] = ema_ap50
             if ema_ar50_90 is not None:
                 log_dict["Metrics/EMA/AR50_90"] = ema_ar50_90
+
+        # Keypoint metrics (indices: 0=AP, 1=AP50, 2=AP75, 5=AR, 6=AR50, 7=AR75)
+        if "test_coco_eval_keypoints" in values:
+            kp_eval = values["test_coco_eval_keypoints"]
+            kp_ap50_90 = safe_index(kp_eval, 0)
+            kp_ap50 = safe_index(kp_eval, 1)
+            kp_ap75 = safe_index(kp_eval, 2)
+            kp_ar50_90 = safe_index(kp_eval, 5)
+            kp_ar50 = safe_index(kp_eval, 6)
+            kp_ar75 = safe_index(kp_eval, 7)
+            if kp_ap50_90 is not None:
+                log_dict["Keypoints/Base/AP50_90"] = kp_ap50_90
+            if kp_ap50 is not None:
+                log_dict["Keypoints/Base/AP50"] = kp_ap50
+            if kp_ap75 is not None:
+                log_dict["Keypoints/Base/AP75"] = kp_ap75
+            if kp_ar50_90 is not None:
+                log_dict["Keypoints/Base/AR50_90"] = kp_ar50_90
+            if kp_ar50 is not None:
+                log_dict["Keypoints/Base/AR50"] = kp_ar50
+            if kp_ar75 is not None:
+                log_dict["Keypoints/Base/AR75"] = kp_ar75
+
+        if "ema_test_coco_eval_keypoints" in values:
+            ema_kp_eval = values["ema_test_coco_eval_keypoints"]
+            ema_kp_ap50_90 = safe_index(ema_kp_eval, 0)
+            ema_kp_ap50 = safe_index(ema_kp_eval, 1)
+            ema_kp_ap75 = safe_index(ema_kp_eval, 2)
+            ema_kp_ar50_90 = safe_index(ema_kp_eval, 5)
+            ema_kp_ar50 = safe_index(ema_kp_eval, 6)
+            ema_kp_ar75 = safe_index(ema_kp_eval, 7)
+            if ema_kp_ap50_90 is not None:
+                log_dict["Keypoints/EMA/AP50_90"] = ema_kp_ap50_90
+            if ema_kp_ap50 is not None:
+                log_dict["Keypoints/EMA/AP50"] = ema_kp_ap50
+            if ema_kp_ap75 is not None:
+                log_dict["Keypoints/EMA/AP75"] = ema_kp_ap75
+            if ema_kp_ar50_90 is not None:
+                log_dict["Keypoints/EMA/AR50_90"] = ema_kp_ar50_90
+            if ema_kp_ar50 is not None:
+                log_dict["Keypoints/EMA/AR50"] = ema_kp_ar50
+            if ema_kp_ar75 is not None:
+                log_dict["Keypoints/EMA/AR75"] = ema_kp_ar75
 
         wandb.log(log_dict)
 
@@ -394,6 +480,49 @@ class MetricsMLFlowSink:
             if ema_ar50_90 is not None:
                 metrics_dict["Metrics/EMA/AR50_90"] = ema_ar50_90
 
+        # Keypoint metrics (indices: 0=AP, 1=AP50, 2=AP75, 5=AR, 6=AR50, 7=AR75)
+        if "test_coco_eval_keypoints" in values:
+            kp_eval = values["test_coco_eval_keypoints"]
+            kp_ap50_90 = safe_index(kp_eval, 0)
+            kp_ap50 = safe_index(kp_eval, 1)
+            kp_ap75 = safe_index(kp_eval, 2)
+            kp_ar50_90 = safe_index(kp_eval, 5)
+            kp_ar50 = safe_index(kp_eval, 6)
+            kp_ar75 = safe_index(kp_eval, 7)
+            if kp_ap50_90 is not None:
+                metrics_dict["Keypoints/Base/AP50_90"] = kp_ap50_90
+            if kp_ap50 is not None:
+                metrics_dict["Keypoints/Base/AP50"] = kp_ap50
+            if kp_ap75 is not None:
+                metrics_dict["Keypoints/Base/AP75"] = kp_ap75
+            if kp_ar50_90 is not None:
+                metrics_dict["Keypoints/Base/AR50_90"] = kp_ar50_90
+            if kp_ar50 is not None:
+                metrics_dict["Keypoints/Base/AR50"] = kp_ar50
+            if kp_ar75 is not None:
+                metrics_dict["Keypoints/Base/AR75"] = kp_ar75
+
+        if "ema_test_coco_eval_keypoints" in values:
+            ema_kp_eval = values["ema_test_coco_eval_keypoints"]
+            ema_kp_ap50_90 = safe_index(ema_kp_eval, 0)
+            ema_kp_ap50 = safe_index(ema_kp_eval, 1)
+            ema_kp_ap75 = safe_index(ema_kp_eval, 2)
+            ema_kp_ar50_90 = safe_index(ema_kp_eval, 5)
+            ema_kp_ar50 = safe_index(ema_kp_eval, 6)
+            ema_kp_ar75 = safe_index(ema_kp_eval, 7)
+            if ema_kp_ap50_90 is not None:
+                metrics_dict["Keypoints/EMA/AP50_90"] = ema_kp_ap50_90
+            if ema_kp_ap50 is not None:
+                metrics_dict["Keypoints/EMA/AP50"] = ema_kp_ap50
+            if ema_kp_ap75 is not None:
+                metrics_dict["Keypoints/EMA/AP75"] = ema_kp_ap75
+            if ema_kp_ar50_90 is not None:
+                metrics_dict["Keypoints/EMA/AR50_90"] = ema_kp_ar50_90
+            if ema_kp_ar50 is not None:
+                metrics_dict["Keypoints/EMA/AR50"] = ema_kp_ar50
+            if ema_kp_ar75 is not None:
+                metrics_dict["Keypoints/EMA/AR75"] = ema_kp_ar75
+
         mlflow.log_metrics(metrics_dict, step=epoch)
 
     def close(self):
@@ -466,6 +595,49 @@ class MetricsClearMLSink:
                 self.logger.report_scalar("Metrics/EMA", "AP50", ema_ap50, epoch)
             if ema_ar50_90 is not None:
                 self.logger.report_scalar("Metrics/EMA", "AR50_90", ema_ar50_90, epoch)
+
+        # Keypoint metrics (indices: 0=AP, 1=AP50, 2=AP75, 5=AR, 6=AR50, 7=AR75)
+        if "test_coco_eval_keypoints" in values:
+            kp_eval = values["test_coco_eval_keypoints"]
+            kp_ap50_90 = safe_index(kp_eval, 0)
+            kp_ap50 = safe_index(kp_eval, 1)
+            kp_ap75 = safe_index(kp_eval, 2)
+            kp_ar50_90 = safe_index(kp_eval, 5)
+            kp_ar50 = safe_index(kp_eval, 6)
+            kp_ar75 = safe_index(kp_eval, 7)
+            if kp_ap50_90 is not None:
+                self.logger.report_scalar("Keypoints/Base", "AP50_90", kp_ap50_90, epoch)
+            if kp_ap50 is not None:
+                self.logger.report_scalar("Keypoints/Base", "AP50", kp_ap50, epoch)
+            if kp_ap75 is not None:
+                self.logger.report_scalar("Keypoints/Base", "AP75", kp_ap75, epoch)
+            if kp_ar50_90 is not None:
+                self.logger.report_scalar("Keypoints/Base", "AR50_90", kp_ar50_90, epoch)
+            if kp_ar50 is not None:
+                self.logger.report_scalar("Keypoints/Base", "AR50", kp_ar50, epoch)
+            if kp_ar75 is not None:
+                self.logger.report_scalar("Keypoints/Base", "AR75", kp_ar75, epoch)
+
+        if "ema_test_coco_eval_keypoints" in values:
+            ema_kp_eval = values["ema_test_coco_eval_keypoints"]
+            ema_kp_ap50_90 = safe_index(ema_kp_eval, 0)
+            ema_kp_ap50 = safe_index(ema_kp_eval, 1)
+            ema_kp_ap75 = safe_index(ema_kp_eval, 2)
+            ema_kp_ar50_90 = safe_index(ema_kp_eval, 5)
+            ema_kp_ar50 = safe_index(ema_kp_eval, 6)
+            ema_kp_ar75 = safe_index(ema_kp_eval, 7)
+            if ema_kp_ap50_90 is not None:
+                self.logger.report_scalar("Keypoints/EMA", "AP50_90", ema_kp_ap50_90, epoch)
+            if ema_kp_ap50 is not None:
+                self.logger.report_scalar("Keypoints/EMA", "AP50", ema_kp_ap50, epoch)
+            if ema_kp_ap75 is not None:
+                self.logger.report_scalar("Keypoints/EMA", "AP75", ema_kp_ap75, epoch)
+            if ema_kp_ar50_90 is not None:
+                self.logger.report_scalar("Keypoints/EMA", "AR50_90", ema_kp_ar50_90, epoch)
+            if ema_kp_ar50 is not None:
+                self.logger.report_scalar("Keypoints/EMA", "AR50", ema_kp_ar50, epoch)
+            if ema_kp_ar75 is not None:
+                self.logger.report_scalar("Keypoints/EMA", "AR75", ema_kp_ar75, epoch)
 
     def close(self):
         if not self.task:

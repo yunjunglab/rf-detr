@@ -275,6 +275,7 @@ class CocoEvaluator(object):
                         "category_id": category_id,
                         "keypoints": keypoint,
                         "score": scores[k],
+                        "bbox": boxes[k],
                     }
                 )
         return coco_results

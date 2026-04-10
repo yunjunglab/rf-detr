@@ -174,26 +174,35 @@ class HungarianMatcher(nn.Module):
         keypoints_present = (
             self.cost_keypoint > 0
             and "pred_keypoints" in outputs
-            and all("keypoints" in t and t["keypoints"].shape[1] > 0 for t in targets)
+            and any("keypoints" in t and t["keypoints"].shape[1] > 0 for t in targets)
         )
         if keypoints_present:
             # pred_kpts: (B*Q, num_keypoints, 2) — normalized xy
             pred_kpts = outputs["pred_keypoints"].flatten(0, 1)  # (B*Q, K, 2)
-            # tgt_kpts: (sum(N_i), K, 3) — normalized [x, y, visibility]
-            tgt_kpts = torch.cat([v["keypoints"] for v in targets])  # (T, K, 3)
-            tgt_kpts_xy = tgt_kpts[..., :2]  # (T, K, 2)
-            tgt_vis = tgt_kpts[..., 2]  # (T, K)
-            # Pairwise L1 over keypoints: (B*Q, T, K)
-            # pred_kpts[:, None]: (B*Q, 1, K, 2)  tgt_kpts_xy[None]: (1, T, K, 2)
-            # Use float16 on CUDA to halve the ~127 MB peak for this intermediate tensor.
-            if pred_kpts.is_cuda:
-                kpt_l1 = (pred_kpts.half()[:, None] - tgt_kpts_xy.half()[None]).abs().sum(-1).float()
-            else:
-                kpt_l1 = (pred_kpts[:, None] - tgt_kpts_xy[None]).abs().sum(-1)  # (B*Q, T, K)
-            # Weight by visibility and average over visible keypoints per target
-            vis_mask = (tgt_vis > 0).float()  # (T, K)
-            vis_sum = vis_mask.sum(-1).clamp(min=1.0)  # (T,)
-            cost_kpt = (kpt_l1 * vis_mask[None]).sum(-1) / vis_sum[None]  # (B*Q, T)
+            # Build cost_kpt per image to handle mixed batches where some images
+            # have no keypoints (shape[1]==0). Images without keypoints get cost=0.
+            total_tgts = sum(len(v["boxes"]) for v in targets)
+            cost_kpt = torch.zeros(
+                pred_kpts.shape[0], total_tgts, device=pred_kpts.device, dtype=pred_kpts.dtype
+            )
+            col_offset = 0
+            for t in targets:
+                n = len(t["boxes"])
+                if n > 0 and "keypoints" in t and t["keypoints"].shape[1] > 0:
+                    tgt_kpts_i = t["keypoints"]  # (n, K, 3)
+                    tgt_kpts_xy = tgt_kpts_i[..., :2]  # (n, K, 2)
+                    tgt_vis = tgt_kpts_i[..., 2]  # (n, K)
+                    # Pairwise L1: (B*Q, n, K)
+                    # Use float16 on CUDA to reduce memory usage.
+                    if pred_kpts.is_cuda:
+                        kpt_l1 = (pred_kpts.half()[:, None] - tgt_kpts_xy.half()[None]).abs().sum(-1).float()
+                    else:
+                        kpt_l1 = (pred_kpts[:, None] - tgt_kpts_xy[None]).abs().sum(-1)
+                    # Weight by visibility and average over visible keypoints per target
+                    vis_mask = (tgt_vis > 0).float()  # (n, K)
+                    vis_sum = vis_mask.sum(-1).clamp(min=1.0)  # (n,)
+                    cost_kpt[:, col_offset : col_offset + n] = (kpt_l1 * vis_mask[None]).sum(-1) / vis_sum[None]
+                col_offset += n
 
         # Final cost matrix
         C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou

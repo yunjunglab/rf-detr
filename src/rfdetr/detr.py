@@ -429,6 +429,11 @@ class RFDETR:
             labels = labels[keep]
             boxes = boxes[keep]
 
+            data = {}
+            if "keypoints" in result:
+                # keypoints shape: (num_select, K, 3) → filter → (N, K, 3)
+                data["keypoints"] = result["keypoints"][keep].float().cpu().numpy()
+
             if "masks" in result:
                 masks = result["masks"]
                 masks = masks[keep]
@@ -438,12 +443,14 @@ class RFDETR:
                     confidence=scores.float().cpu().numpy(),
                     class_id=labels.cpu().numpy(),
                     mask=masks.squeeze(1).cpu().numpy(),
+                    data=data if data else None,
                 )
             else:
                 detections = sv.Detections(
                     xyxy=boxes.float().cpu().numpy(),
                     confidence=scores.float().cpu().numpy(),
                     class_id=labels.cpu().numpy(),
+                    data=data if data else None,
                 )
 
             detections_list.append(detections)
